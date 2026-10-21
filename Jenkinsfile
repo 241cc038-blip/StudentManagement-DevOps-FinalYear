@@ -1,14 +1,14 @@
 pipeline {
     agent any
 
-    environment {
-        PYTHON = 'C:\\Users\\Duraimurugan T\\AppData\\Local\\Programs\\Python\\Python314\\python.exe'
-        IMAGE_NAME = 'student-management-finalyear'
-        CONTAINER_NAME = 'student-management-finalyear'
-        APP_PORT = '5001'
-        DATABASE_CONTAINER = 'studentmanagement-devops-finalyear-db-1'
-    }
-
+environment {
+    PYTHON = 'C:\\Users\\Duraimurugan T\\AppData\\Local\\Programs\\Python\\Python314\\python.exe'
+    DOCKER = 'C:\\Users\\Duraimurugan T\\AppData\\Local\\Programs\\DockerDesktop\\resources\\bin\\docker.exe'
+    IMAGE_NAME = 'student-management-finalyear'
+    CONTAINER_NAME = 'student-management-finalyear'
+    APP_PORT = '5001'
+    DATABASE_CONTAINER = 'studentmanagement-devops-finalyear-db-1'
+}
     stages {
         stage('Checkout') {
             steps {
@@ -17,11 +17,11 @@ pipeline {
         }
 
         stage('Check Python and Docker') {
-            steps {
-                bat '"%PYTHON%" --version'
-                bat 'docker version'
-            }
-        }
+    steps {
+        bat '"%PYTHON%" --version'
+        bat '"%DOCKER%" version'
+    }
+}
 
         stage('Install Dependencies') {
             steps {
