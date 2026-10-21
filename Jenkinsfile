@@ -57,28 +57,34 @@ bat '"%DOCKER%" build -t %IMAGE_NAME%:%BUILD_NUMBER% .'
                         variable: 'APP_SECRET_KEY'
                     )
                 ]) {
-                    powershell '''
-                    $ErrorActionPreference = "Stop"
+                  
+powershell '''
+$ErrorActionPreference = "Stop"
+$docker = "C:\Users\Duraimurugan T\AppData\Local\Programs\DockerDesktop\resources\bin\docker.exe"
 
-                    docker rm -f $env:CONTAINER_NAME 2>$null
-                    $LASTEXITCODE = 0
+$image = "student-management-finalyear:$env:BUILD_NUMBER"
+Write-Host "Deploying image: [$image]"
 
-                    docker run -d `
-                      --name $env:CONTAINER_NAME `
-                      --restart unless-stopped `
-                      --network studentmanagement-devops-finalyear_default `
-                      -p "$($env:APP_PORT):5000" `
-                      -e "SECRET_KEY=$env:APP_SECRET_KEY" `
-                      -e "POSTGRES_USER=postgres" `
-                      -e "POSTGRES_PASSWORD=$env:DB_PASSWORD" `
-                      -e "POSTGRES_DB=student_management" `
-                      -e "POSTGRES_HOST=$env:DATABASE_CONTAINER" `
-                      -e "POSTGRES_PORT=5432" `
-                      "$($env:IMAGE_NAME):$($env:BUILD_NUMBER)"
+& $docker rm -f $env:CONTAINER_NAME 2>$null
 
-                    if ($LASTEXITCODE -ne 0) {
-                        throw "Docker deployment failed."
-                    }
+& $docker run -d `
+    --name $env:CONTAINER_NAME `
+    --restart unless-stopped `
+    --network studentmanagement-devops-finalyear_default `
+    -p "$($env:APP_PORT):5000" `
+    -e "SECRET_KEY=$env:APP_SECRET_KEY" `
+    -e "POSTGRES_USER=postgres" `
+    -e "POSTGRES_PASSWORD=$env:DB_PASSWORD" `
+    -e "POSTGRES_DB=student_management" `
+    -e "POSTGRES_HOST=$env:DATABASE_CONTAINER" `
+    -e "POSTGRES_PORT=5432" `
+    $image
+
+if ($LASTEXITCODE -ne 0) {
+    throw "Docker deployment failed."
+}
+'''
+
 
                     Write-Host "Deployment container started."
                     '''
