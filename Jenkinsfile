@@ -49,15 +49,17 @@ pipeline {
                     string(
                         credentialsId: 'POSTGRES_PASSWORD',
                         variable: 'DB_PASSWORD'
+                    ),
+                    string(
+                        credentialsId: 'APP_SECRET_KEY',
+                        variable: 'APP_SECRET_KEY'
                     )
                 ]) {
                     powershell '''
                     $ErrorActionPreference = "Stop"
 
                     docker rm -f $env:CONTAINER_NAME 2>$null
-                    if ($LASTEXITCODE -ne 0) {
-                        Write-Host "No previous deployment container to remove."
-                    }
+                    $LASTEXITCODE = 0
 
                     docker run -d `
                       --name $env:CONTAINER_NAME `
@@ -75,6 +77,8 @@ pipeline {
                     if ($LASTEXITCODE -ne 0) {
                         throw "Docker deployment failed."
                     }
+
+                    Write-Host "Deployment container started."
                     '''
                 }
             }
@@ -97,6 +101,7 @@ pipeline {
                         }
                     }
                     catch {
+                        Write-Host "Waiting for application health check..."
                         Start-Sleep -Seconds 5
                     }
                 }
@@ -122,4 +127,7 @@ pipeline {
         }
 
         always {
-            echo
+            echo 'Jenkins pipeline completed.'
+        }
+    }
+}
