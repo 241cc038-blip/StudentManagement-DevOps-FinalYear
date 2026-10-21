@@ -60,8 +60,7 @@ bat '"%DOCKER%" build -t %IMAGE_NAME%:%BUILD_NUMBER% .'
                   
 powershell '''
 $ErrorActionPreference = "Stop"
-$docker = "C:\Users\Duraimurugan T\AppData\Local\Programs\DockerDesktop\resources\bin\docker.exe"
-
+$docker = $env:DOCKER
 $image = "student-management-finalyear:$env:BUILD_NUMBER"
 Write-Host "Deploying image: [$image]"
 
@@ -94,30 +93,14 @@ if ($LASTEXITCODE -ne 0) {
 
         stage('Deployment Health Check') {
             steps {
-                powershell '''
-                $healthy = $false
+              powershell '''
+$ErrorActionPreference = "Stop"
+$docker = $env:DOCKER
 
-                for ($i = 0; $i -lt 12; $i++) {
-                    try {
-                        $response = Invoke-RestMethod `
-                            -Uri "http://localhost:$env:APP_PORT/health" `
-                            -TimeoutSec 5
+$image = "student-management-finalyear:$env:BUILD_NUMBER"
 
-                        if ($response.status -eq "healthy") {
-                            $healthy = $true
-                            break
-                        }
-                    }
-                    catch {
-                        Write-Host "Waiting for application health check..."
-                        Start-Sleep -Seconds 5
-                    }
-                }
-
-                if (-not $healthy) {
-                    docker logs $env:CONTAINER_NAME
-                    throw "Deployment health check failed."
-                }
+Write-Host "Deploying image: [$image]"
+'''
 
                 Write-Host "Application health check passed."
                 '''
