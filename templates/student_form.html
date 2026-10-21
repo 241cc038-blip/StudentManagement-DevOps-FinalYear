@@ -1,0 +1,21 @@
+{% extends "base.html" %}
+{% block title %}{{ 'Edit' if student else 'Add' }} Student{% endblock %}
+{% block content %}
+<div class="row justify-content-center"><div class="col-lg-8">
+<div class="card p-4">
+<h1 class="h3">{{ 'Edit student' if student else 'Add student' }}</h1>
+<form method="post">
+<div class="row g-3">
+<div class="col-md-6"><label class="form-label">Register number *</label><input class="form-control" name="register_number" value="{{ student.register_number if student else '' }}" required></div>
+<div class="col-md-6"><label class="form-label">Full name *</label><input class="form-control" name="full_name" value="{{ student.full_name if student else '' }}" required></div>
+<div class="col-md-6"><label class="form-label">Email *</label><input class="form-control" type="email" name="email" value="{{ student.email if student else '' }}" required></div>
+<div class="col-md-6"><label class="form-label">Department *</label><input class="form-control" name="department" value="{{ student.department if student else '' }}" placeholder="BSc IT" required></div>
+<div class="col-md-6"><label class="form-label">Academic year *</label><select class="form-select" name="year" required>
+<option value="">Choose year</option>
+{% for y in ['I Year','II Year','III Year'] %}<option value="{{ y }}" {% if student and student.year == y %}selected{% endif %}>{{ y }}</option>{% endfor %}
+</select></div>
+<div class="col-md-6"><label class="form-label">Phone</label><input class="form-control" name="phone" value="{{ student.phone if student and student.phone else '' }}"></div>
+</div>
+<div class="mt-4"><button class="btn btn-primary">Save record</button> <a class="btn btn-outline-secondary" href="{{ url_for('dashboard') }}">Cancel</a></div>
+</form></div></div></div>
+{% endblock %}

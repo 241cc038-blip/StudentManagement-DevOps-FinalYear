@@ -1,0 +1,15 @@
+{% extends "base.html" %}
+{% block title %}Register{% endblock %}
+{% block content %}
+<div class="row justify-content-center"><div class="col-md-6 col-lg-5">
+<div class="card p-4">
+<h2>Create student account</h2>
+<form method="post">
+  <label class="form-label mt-2">Username</label>
+  <input class="form-control" name="username" minlength="3" required>
+  <label class="form-label mt-3">Password (minimum 8 characters)</label>
+  <input class="form-control" name="password" type="password" minlength="8" required>
+  <button class="btn btn-primary mt-4 w-100">Register</button>
+</form>
+</div></div></div>
+{% endblock %}

@@ -1,0 +1,32 @@
+{% extends "base.html" %}
+{% block title %}Dashboard{% endblock %}
+{% block content %}
+<div class="d-flex flex-wrap justify-content-between align-items-center mb-4 gap-2">
+  <div><h1 class="h2 mb-1">Dashboard</h1><p class="text-secondary mb-0">Student records and academic details</p></div>
+  {% if session.get('role') == 'admin' %}
+    <a class="btn btn-primary" href="{{ url_for('add_student') }}">+ Add student</a>
+  {% endif %}
+</div>
+<div class="row g-3 mb-4">
+  <div class="col-md-6"><div class="card p-3"><div class="text-secondary">Total students</div><div class="display-6 fw-bold">{{ total_students }}</div></div></div>
+  <div class="col-md-6"><div class="card p-3"><div class="text-secondary">Departments</div><div class="display-6 fw-bold">{{ total_departments }}</div></div></div>
+</div>
+<div class="card p-3">
+<form class="row g-2 mb-3" method="get">
+  <div class="col"><input class="form-control" name="q" value="{{ query }}" placeholder="Search name, register number, email or department"></div>
+  <div class="col-auto"><button class="btn btn-outline-primary">Search</button></div>
+  <div class="col-auto"><a class="btn btn-outline-secondary" href="{{ url_for('dashboard') }}">Reset</a></div>
+</form>
+<div class="table-responsive"><table class="table table-hover align-middle">
+<thead><tr><th>Register No.</th><th>Name</th><th>Email</th><th>Department</th><th>Year</th><th>Phone</th>{% if session.get('role') == 'admin' %}<th>Actions</th>{% endif %}</tr></thead>
+<tbody>
+{% for s in students %}
+<tr><td>{{ s.register_number }}</td><td class="fw-semibold">{{ s.full_name }}</td><td>{{ s.email }}</td><td>{{ s.department }}</td><td>{{ s.year }}</td><td>{{ s.phone or '—' }}</td>
+{% if session.get('role') == 'admin' %}<td class="text-nowrap"><a class="btn btn-sm btn-outline-primary" href="{{ url_for('edit_student', student_id=s.id) }}">Edit</a>
+<form class="d-inline" method="post" action="{{ url_for('delete_student', student_id=s.id) }}" onsubmit="return confirm('Delete this student record?')"><button class="btn btn-sm btn-outline-danger">Delete</button></form></td>{% endif %}
+</tr>
+{% else %}<tr><td colspan="7" class="text-center text-secondary py-4">No student records found.</td></tr>{% endfor %}
+</tbody></table></div>
+{% if session.get('role') != 'admin' %}<p class="small text-secondary mb-0">Student accounts have view-only access. Contact an administrator to modify records.</p>{% endif %}
+</div>
+{% endblock %}

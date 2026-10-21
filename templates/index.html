@@ -1,0 +1,25 @@
+{% extends "base.html" %}
+{% block title %}StudentOps | Home{% endblock %}
+{% block content %}
+<div class="row align-items-center g-4 py-5">
+  <div class="col-lg-7">
+    <span class="badge text-bg-primary mb-3">FINAL YEAR BSc IT · DEVOPS PROJECT</span>
+    <h1 class="display-4 fw-bold">Student records.<br>Smarter operations.</h1>
+    <p class="lead text-secondary">A student management platform with secure access, PostgreSQL persistence, automated tests, Docker packaging and a Jenkins CI/CD pipeline.</p>
+    <a class="btn btn-primary btn-lg me-2" href="{{ url_for('login') }}">Sign in</a>
+    <a class="btn btn-outline-secondary btn-lg" href="{{ url_for('register') }}">Create account</a>
+  </div>
+  <div class="col-lg-5">
+    <div class="card p-4">
+      <h4>Project modules</h4>
+      <ul class="mb-0">
+        <li>Student CRUD and search</li>
+        <li>Role-based administrator access</li>
+        <li>PostgreSQL database</li>
+        <li>Pytest automated tests</li>
+        <li>Docker and Jenkins deployment</li>
+      </ul>
+    </div>
+  </div>
+</div>
+{% endblock %}
