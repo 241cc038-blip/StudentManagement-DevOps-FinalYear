@@ -92,10 +92,16 @@ if ($dbRunning -ne "true") {
     throw "Database container is not running."
 }
 
-# Check existing application container
-& $docker container inspect $env:CONTAINER_NAME *> $null
+# Check existing application container safely
+$existingContainer = & $docker ps -a `
+    --filter "name=^/$($env:CONTAINER_NAME)$" `
+    --format "{{.Names}}"
 
-if ($LASTEXITCODE -eq 0) {
+if ($LASTEXITCODE -ne 0) {
+    throw "Unable to check Docker containers."
+}
+
+if ($existingContainer -eq $env:CONTAINER_NAME) {
 
     Write-Host "Removing old application container..."
 
@@ -104,6 +110,9 @@ if ($LASTEXITCODE -eq 0) {
     if ($LASTEXITCODE -ne 0) {
         throw "Failed to remove old container."
     }
+
+} else {
+    Write-Host "No existing container found. Creating new container..."
 }
 
 # Deploy application
