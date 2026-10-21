@@ -8,7 +8,9 @@ pipeline {
         IMAGE_NAME = 'student-management-finalyear'
         CONTAINER_NAME = 'student-management-finalyear'
         APP_PORT = '5001'
+
         DATABASE_CONTAINER = 'studentmanagement-devops-finalyear-db-1'
+        DOCKER_NETWORK = 'studentmanagement-devops-finalyear_default'
     }
 
     stages {
@@ -28,7 +30,6 @@ pipeline {
 
         stage('Install Dependencies') {
             steps {
-                bat '"%PYTHON%" -m pip install --upgrade pip'
                 bat '"%PYTHON%" -m pip install -r requirements.txt'
                 bat '"%PYTHON%" -m pip install -r requirements-dev.txt'
             }
@@ -65,26 +66,53 @@ $ErrorActionPreference = "Stop"
 $docker = $env:DOCKER
 $image = "$($env:IMAGE_NAME):$($env:BUILD_NUMBER)"
 
-Write-Host "Deploying image: [$image]"
+Write-Host "Starting Docker deployment..."
+Write-Host "Image: $image"
 
-# Check whether the deployment container already exists
+# Check Docker network
+& $docker network inspect $env:DOCKER_NETWORK *> $null
+
+if ($LASTEXITCODE -ne 0) {
+    throw "Docker network not found."
+}
+
+# Check database container
+& $docker inspect $env:DATABASE_CONTAINER *> $null
+
+if ($LASTEXITCODE -ne 0) {
+    throw "Database container not found."
+}
+
+# Check database is running
+$dbRunning = & $docker inspect `
+    --format '{{.State.Running}}' `
+    $env:DATABASE_CONTAINER
+
+if ($dbRunning -ne "true") {
+    throw "Database container is not running."
+}
+
+# Check existing application container
 & $docker container inspect $env:CONTAINER_NAME *> $null
 
 if ($LASTEXITCODE -eq 0) {
-    Write-Host "Removing existing deployment container..."
+
+    Write-Host "Removing old application container..."
 
     & $docker rm -f $env:CONTAINER_NAME
 
     if ($LASTEXITCODE -ne 0) {
-        throw "Failed to remove existing container."
+        throw "Failed to remove old container."
     }
 }
 
-# Start the new deployment container
+# Deploy application
+Write-Host "Creating new application container..."
+
 & $docker run -d `
     --name $env:CONTAINER_NAME `
     --restart unless-stopped `
-    --network studentmanagement-devops-finalyear_default `
+    --network $env:DOCKER_NETWORK `
     -p "$($env:APP_PORT):5000" `
     -e "SECRET_KEY=$env:APP_SECRET_KEY" `
     -e "POSTGRES_USER=postgres" `
@@ -95,10 +123,10 @@ if ($LASTEXITCODE -eq 0) {
     $image
 
 if ($LASTEXITCODE -ne 0) {
-    throw "Docker deployment failed."
+    throw "Docker container deployment failed."
 }
 
-Write-Host "Deployment container started."
+Write-Host "Docker container created successfully."
 '''
                 }
             }
@@ -106,7 +134,6 @@ Write-Host "Deployment container started."
 
         stage('Deployment Health Check') {
             steps {
-
                 powershell '''
 $ErrorActionPreference = "Stop"
 
@@ -115,22 +142,25 @@ $healthy = $false
 
 Write-Host "Checking application health..."
 
-for ($i = 0; $i -lt 12; $i++) {
+for ($i = 1; $i -le 12; $i++) {
 
     try {
+
         $response = Invoke-RestMethod `
             -Uri "http://localhost:$($env:APP_PORT)/health" `
             -TimeoutSec 5
 
-        if ($response.status -eq "healthy" -and
-            $response.database -eq "connected") {
-
+        if (
+            $response.status -eq "healthy" -and
+            $response.database -eq "connected"
+        ) {
             $healthy = $true
             break
         }
+
     }
     catch {
-        Write-Host "Waiting for application health check..."
+        Write-Host "Application not ready. Attempt $i of 12."
     }
 
     Start-Sleep -Seconds 5
@@ -154,11 +184,14 @@ Write-Host "Application health check passed."
     post {
 
         success {
-            echo 'SUCCESS: Tests passed, Docker image built, and deployment health check passed.'
+            echo 'SUCCESS: All tests passed.'
+            echo 'SUCCESS: Docker image built.'
+            echo 'SUCCESS: Application deployed.'
+            echo 'SUCCESS: Health check passed.'
         }
 
         failure {
-            echo 'FAILED: Check Console Output for the exact error.'
+            echo 'FAILED: Check Jenkins Console Output.'
         }
 
         always {
