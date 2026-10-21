@@ -1,15 +1,18 @@
 pipeline {
     agent any
 
-environment {
-    PYTHON = 'C:\\Users\\Duraimurugan T\\AppData\\Local\\Programs\\Python\\Python314\\python.exe'
-    DOCKER = 'C:\\Users\\Duraimurugan T\\AppData\\Local\\Programs\\DockerDesktop\\resources\\bin\\docker.exe'
-    IMAGE_NAME = 'student-management-finalyear'
-    CONTAINER_NAME = 'student-management-finalyear'
-    APP_PORT = '5001'
-    DATABASE_CONTAINER = 'studentmanagement-devops-finalyear-db-1'
-}
+    environment {
+        PYTHON = 'C:\\Users\\Duraimurugan T\\AppData\\Local\\Programs\\Python\\Python314\\python.exe'
+        DOCKER = 'C:\\Users\\Duraimurugan T\\AppData\\Local\\Programs\\DockerDesktop\\resources\\bin\\docker.exe'
+
+        IMAGE_NAME = 'student-management-finalyear'
+        CONTAINER_NAME = 'student-management-finalyear'
+        APP_PORT = '5001'
+        DATABASE_CONTAINER = 'studentmanagement-devops-finalyear-db-1'
+    }
+
     stages {
+
         stage('Checkout') {
             steps {
                 checkout scm
@@ -17,11 +20,11 @@ environment {
         }
 
         stage('Check Python and Docker') {
-    steps {
-        bat '"%PYTHON%" --version'
-        bat '"%DOCKER%" version'
-    }
-}
+            steps {
+                bat '"%PYTHON%" --version'
+                bat '"%DOCKER%" version'
+            }
+        }
 
         stage('Install Dependencies') {
             steps {
@@ -39,9 +42,7 @@ environment {
 
         stage('Build Docker Image') {
             steps {
-                
-bat '"%DOCKER%" build -t %IMAGE_NAME%:%BUILD_NUMBER% .'
-
+                bat '"%DOCKER%" build -t %IMAGE_NAME%:%BUILD_NUMBER% .'
             }
         }
 
@@ -57,15 +58,29 @@ bat '"%DOCKER%" build -t %IMAGE_NAME%:%BUILD_NUMBER% .'
                         variable: 'APP_SECRET_KEY'
                     )
                 ]) {
-                  
-powershell '''
+
+                    powershell '''
 $ErrorActionPreference = "Stop"
+
 $docker = $env:DOCKER
-$image = "student-management-finalyear:$env:BUILD_NUMBER"
+$image = "$($env:IMAGE_NAME):$($env:BUILD_NUMBER)"
+
 Write-Host "Deploying image: [$image]"
 
-& $docker rm -f $env:CONTAINER_NAME 2>$null
+# Check whether the deployment container already exists
+& $docker container inspect $env:CONTAINER_NAME *> $null
 
+if ($LASTEXITCODE -eq 0) {
+    Write-Host "Removing existing deployment container..."
+
+    & $docker rm -f $env:CONTAINER_NAME
+
+    if ($LASTEXITCODE -ne 0) {
+        throw "Failed to remove existing container."
+    }
+}
+
+# Start the new deployment container
 & $docker run -d `
     --name $env:CONTAINER_NAME `
     --restart unless-stopped `
@@ -82,33 +97,62 @@ Write-Host "Deploying image: [$image]"
 if ($LASTEXITCODE -ne 0) {
     throw "Docker deployment failed."
 }
+
+Write-Host "Deployment container started."
 '''
-
-
-                    Write-Host "Deployment container started."
-                    '''
                 }
             }
         }
 
         stage('Deployment Health Check') {
             steps {
-              powershell '''
+
+                powershell '''
 $ErrorActionPreference = "Stop"
+
 $docker = $env:DOCKER
+$healthy = $false
 
-$image = "student-management-finalyear:$env:BUILD_NUMBER"
+Write-Host "Checking application health..."
 
-Write-Host "Deploying image: [$image]"
+for ($i = 0; $i -lt 12; $i++) {
+
+    try {
+        $response = Invoke-RestMethod `
+            -Uri "http://localhost:$($env:APP_PORT)/health" `
+            -TimeoutSec 5
+
+        if ($response.status -eq "healthy" -and
+            $response.database -eq "connected") {
+
+            $healthy = $true
+            break
+        }
+    }
+    catch {
+        Write-Host "Waiting for application health check..."
+    }
+
+    Start-Sleep -Seconds 5
+}
+
+if (-not $healthy) {
+
+    Write-Host "Application health check failed."
+
+    & $docker logs $env:CONTAINER_NAME
+
+    throw "Deployment health check failed."
+}
+
+Write-Host "Application health check passed."
 '''
-
-                Write-Host "Application health check passed."
-                '''
             }
         }
     }
 
     post {
+
         success {
             echo 'SUCCESS: Tests passed, Docker image built, and deployment health check passed.'
         }
