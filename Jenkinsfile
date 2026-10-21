@@ -1,8 +1,8 @@
-
 pipeline {
     agent any
 
     environment {
+        PYTHON = 'C:\\Users\\Duraimurugan T\\AppData\\Local\\Programs\\Python\\Python314\\python.exe'
         IMAGE_NAME = 'student-management-finalyear'
         CONTAINER_NAME = 'student-management-finalyear'
         APP_PORT = '5001'
@@ -10,23 +10,30 @@ pipeline {
     }
 
     stages {
-
         stage('Checkout') {
             steps {
                 checkout scm
             }
         }
 
+        stage('Check Python and Docker') {
+            steps {
+                bat '"%PYTHON%" --version'
+                bat 'docker version'
+            }
+        }
+
         stage('Install Dependencies') {
             steps {
-                bat 'python -m pip install -r requirements.txt'
-                bat 'python -m pip install -r requirements-dev.txt'
+                bat '"%PYTHON%" -m pip install --upgrade pip'
+                bat '"%PYTHON%" -m pip install -r requirements.txt'
+                bat '"%PYTHON%" -m pip install -r requirements-dev.txt'
             }
         }
 
         stage('Automated Tests') {
             steps {
-                bat 'python -m pytest -v'
+                bat '"%PYTHON%" -m pytest -v'
             }
         }
 
@@ -38,25 +45,36 @@ pipeline {
 
         stage('Deploy Container') {
             steps {
-                script {
-                    bat '''
-                    docker rm -f %CONTAINER_NAME% 2>NUL
-                    if errorlevel 1 exit /b 0
-                    '''
+                withCredentials([
+                    string(
+                        credentialsId: 'POSTGRES_PASSWORD',
+                        variable: 'DB_PASSWORD'
+                    )
+                ]) {
+                    powershell '''
+                    $ErrorActionPreference = "Stop"
 
-                    bat '''
-                    docker run -d ^
-                      --name %CONTAINER_NAME% ^
-                      --restart unless-stopped ^
-                      --network studentmanagement-devops-finalyear_default ^
-                      -p %APP_PORT%:5000 ^
-                      -e SECRET_KEY=jenkins-demo-change-this-secret ^
-                      -e POSTGRES_USER=postgres ^
-                      -e POSTGRES_PASSWORD="%POSTGRES_PASSWORD%" ^
-                      -e POSTGRES_DB=student_management ^
-                      -e POSTGRES_HOST=%DATABASE_CONTAINER% ^
-                      -e POSTGRES_PORT=5432 ^
-                      %IMAGE_NAME%:%BUILD_NUMBER%
+                    docker rm -f $env:CONTAINER_NAME 2>$null
+                    if ($LASTEXITCODE -ne 0) {
+                        Write-Host "No previous deployment container to remove."
+                    }
+
+                    docker run -d `
+                      --name $env:CONTAINER_NAME `
+                      --restart unless-stopped `
+                      --network studentmanagement-devops-finalyear_default `
+                      -p "$($env:APP_PORT):5000" `
+                      -e "SECRET_KEY=$env:APP_SECRET_KEY" `
+                      -e "POSTGRES_USER=postgres" `
+                      -e "POSTGRES_PASSWORD=$env:DB_PASSWORD" `
+                      -e "POSTGRES_DB=student_management" `
+                      -e "POSTGRES_HOST=$env:DATABASE_CONTAINER" `
+                      -e "POSTGRES_PORT=5432" `
+                      "$($env:IMAGE_NAME):$($env:BUILD_NUMBER)"
+
+                    if ($LASTEXITCODE -ne 0) {
+                        throw "Docker deployment failed."
+                    }
                     '''
                 }
             }
@@ -64,8 +82,31 @@ pipeline {
 
         stage('Deployment Health Check') {
             steps {
-                bat '''
-                powershell -NoProfile -Command "$ok = $false; for ($i = 0; $i -lt 12; $i++) { try { $r = Invoke-RestMethod -Uri 'http://localhost:5001/health' -TimeoutSec 3; if ($r.status -eq 'healthy') { $ok = $true; break } } catch { Start-Sleep -Seconds 5 } }; if (-not $ok) { docker logs %CONTAINER_NAME%; exit 1 }"
+                powershell '''
+                $healthy = $false
+
+                for ($i = 0; $i -lt 12; $i++) {
+                    try {
+                        $response = Invoke-RestMethod `
+                            -Uri "http://localhost:$env:APP_PORT/health" `
+                            -TimeoutSec 5
+
+                        if ($response.status -eq "healthy") {
+                            $healthy = $true
+                            break
+                        }
+                    }
+                    catch {
+                        Start-Sleep -Seconds 5
+                    }
+                }
+
+                if (-not $healthy) {
+                    docker logs $env:CONTAINER_NAME
+                    throw "Deployment health check failed."
+                }
+
+                Write-Host "Application health check passed."
                 '''
             }
         }
@@ -77,11 +118,8 @@ pipeline {
         }
 
         failure {
-            echo 'FAILED: Check Console Output and Docker logs.'
+            echo 'FAILED: Check Console Output for the exact error.'
         }
 
         always {
-            echo 'Jenkins pipeline completed.'
-        }
-    }
-}
+            echo
