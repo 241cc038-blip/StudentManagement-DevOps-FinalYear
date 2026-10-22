@@ -1,7 +1,7 @@
-
 import os
 from functools import wraps
 from datetime import datetime
+from urllib.parse import quote_plus
 
 from flask import (
     Flask,
@@ -12,7 +12,9 @@ from flask import (
     render_template_string,
     jsonify,
 )
+
 from flask_sqlalchemy import SQLAlchemy
+
 from flask_login import (
     LoginManager,
     UserMixin,
@@ -21,6 +23,7 @@ from flask_login import (
     login_required,
     current_user,
 )
+
 from werkzeug.security import generate_password_hash, check_password_hash
 
 
@@ -29,15 +32,14 @@ from werkzeug.security import generate_password_hash, check_password_hash
 # --------------------------------------------------
 
 db = SQLAlchemy()
+
 login_manager = LoginManager()
 login_manager.login_view = "login"
 login_manager.login_message_category = "warning"
 
 
 # --------------------------------------------------
-# Database models
-# IMPORTANT: Keep models outside create_app()
-# This prevents duplicate-table pytest errors.
+# Database Models
 # --------------------------------------------------
 
 class User(UserMixin, db.Model):
@@ -65,6 +67,7 @@ class Student(db.Model):
     department = db.Column(db.String(100), nullable=False)
     year = db.Column(db.String(30), nullable=False)
     phone = db.Column(db.String(20), nullable=False)
+
     created_at = db.Column(
         db.DateTime,
         default=datetime.utcnow,
@@ -74,30 +77,38 @@ class Student(db.Model):
 
 @login_manager.user_loader
 def load_user(user_id):
-    return db.session.get(User, int(user_id))
+    try:
+        return db.session.get(User, int(user_id))
+    except (ValueError, TypeError):
+        return None
 
 
 # --------------------------------------------------
-# Simple page templates
-# These allow the application to work independently
-# of the existing HTML template files.
+# Base HTML Template
 # --------------------------------------------------
 
 BASE_TEMPLATE = """
 <!DOCTYPE html>
 <html lang="en">
+
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
+
     <title>{{ title }} - Student Management System</title>
+
     <style>
-        * { box-sizing: border-box; }
+        * {
+            box-sizing: border-box;
+        }
+
         body {
             margin: 0;
             font-family: Arial, sans-serif;
             background: #f3f6fb;
             color: #253047;
         }
+
         nav {
             background: #182848;
             color: white;
@@ -108,7 +119,17 @@ BASE_TEMPLATE = """
             flex-wrap: wrap;
             gap: 12px;
         }
-        nav a { color: white; text-decoration: none; margin-left: 14px; }
+
+        nav a {
+            color: white;
+            text-decoration: none;
+            margin-left: 14px;
+        }
+
+        nav a:hover {
+            color: #87b5ff;
+        }
+
         .container {
             max-width: 1050px;
             margin: 32px auto;
@@ -117,7 +138,11 @@ BASE_TEMPLATE = """
             border-radius: 12px;
             box-shadow: 0 4px 18px #0000000d;
         }
-        h1, h2 { color: #182848; }
+
+        h1, h2 {
+            color: #182848;
+        }
+
         input, select {
             width: 100%;
             padding: 11px;
@@ -125,6 +150,12 @@ BASE_TEMPLATE = """
             border: 1px solid #ccd3df;
             border-radius: 6px;
         }
+
+        input:focus {
+            outline: none;
+            border-color: #2457c5;
+        }
+
         button, .btn {
             display: inline-block;
             background: #2457c5;
@@ -136,35 +167,104 @@ BASE_TEMPLATE = """
             text-decoration: none;
             margin: 3px;
         }
-        .danger { background: #c0392b; }
-        .secondary { background: #566477; }
-        table { width: 100%; border-collapse: collapse; margin-top: 18px; }
-        th, td { border-bottom: 1px solid #e4e8ef; padding: 11px; text-align: left; }
-        th { background: #edf2fb; }
-        .message { padding: 12px; background: #fff1c9; border-radius: 6px; margin: 10px 0; }
-        .success { background: #dff6e7; }
-        .muted { color: #667085; }
-        .cards { display: flex; gap: 15px; flex-wrap: wrap; }
-        .card { background: #edf2fb; padding: 18px; border-radius: 8px; flex: 1; min-width: 180px; }
-        footer { text-align: center; color: #667085; padding: 20px; }
+
+        button:hover, .btn:hover {
+            opacity: 0.9;
+        }
+
+        .danger {
+            background: #c0392b;
+        }
+
+        .secondary {
+            background: #566477;
+        }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 18px;
+        }
+
+        th, td {
+            border-bottom: 1px solid #e4e8ef;
+            padding: 11px;
+            text-align: left;
+        }
+
+        th {
+            background: #edf2fb;
+        }
+
+        .message {
+            padding: 12px;
+            background: #fff1c9;
+            border-radius: 6px;
+            margin: 10px 0;
+        }
+
+        .success {
+            background: #dff6e7;
+        }
+
+        .cards {
+            display: flex;
+            gap: 15px;
+            flex-wrap: wrap;
+        }
+
+        .card {
+            background: #edf2fb;
+            padding: 18px;
+            border-radius: 8px;
+            flex: 1;
+            min-width: 180px;
+        }
+
+        .table-container {
+            overflow-x: auto;
+        }
+
+        footer {
+            text-align: center;
+            color: #667085;
+            padding: 20px;
+        }
+
         @media (max-width: 650px) {
-            .container { margin: 12px; padding: 16px; overflow-x: auto; }
-            nav { padding: 14px; }
-            nav a { margin-left: 6px; }
+            .container {
+                margin: 12px;
+                padding: 16px;
+            }
+
+            nav {
+                padding: 14px;
+            }
+
+            nav a {
+                margin-left: 6px;
+            }
         }
     </style>
 </head>
+
 <body>
+
 <nav>
     <strong>Student Management System</strong>
+
     <div>
         <a href="{{ url_for('home') }}">Home</a>
+
         {% if current_user.is_authenticated %}
             <a href="{{ url_for('dashboard') }}">Dashboard</a>
+
             {% if current_user.role == 'admin' %}
                 <a href="{{ url_for('students') }}">Students</a>
             {% endif %}
+
             <a href="{{ url_for('logout') }}">Logout</a>
+
         {% else %}
             <a href="{{ url_for('login') }}">Login</a>
             <a href="{{ url_for('register') }}">Register</a>
@@ -173,6 +273,7 @@ BASE_TEMPLATE = """
 </nav>
 
 <main class="container">
+
     {% with messages = get_flashed_messages(with_categories=true) %}
         {% for category, message in messages %}
             <div class="message {{ 'success' if category == 'success' else '' }}">
@@ -180,34 +281,48 @@ BASE_TEMPLATE = """
             </div>
         {% endfor %}
     {% endwith %}
+
     {{ content|safe }}
+
 </main>
 
-<footer>Student Management System | Flask + SQLAlchemy + Docker + Jenkins</footer>
+<footer>
+    Student Management System | Flask + SQLAlchemy + Docker + Jenkins
+</footer>
+
 </body>
 </html>
 """
 
 
-def render_page(title, content, **context):
+# --------------------------------------------------
+# Render Page Function
+# --------------------------------------------------
+
+def render_page(page_title, content, **context):
+    page_content = render_template_string(
+        content,
+        **context
+    )
+
     return render_template_string(
         BASE_TEMPLATE,
-        title=title,
-        content=render_template_string(content, **context),
+        title=page_title,
+        content=page_content
     )
 
 
 # --------------------------------------------------
-# Application factory
+# Application Factory
 # --------------------------------------------------
 
 def create_app(test_config=None):
+
     app = Flask(__name__)
 
     database_url = os.environ.get("DATABASE_URL")
 
     if not database_url:
-        # Supports the POSTGRES_* variables in your .env file.
         db_user = os.environ.get("POSTGRES_USER", "postgres")
         db_password = os.environ.get("POSTGRES_PASSWORD", "")
         db_host = os.environ.get("POSTGRES_HOST", "db")
@@ -215,34 +330,33 @@ def create_app(test_config=None):
         db_name = os.environ.get("POSTGRES_DB", "student_management")
 
         if db_password:
-            from urllib.parse import quote_plus
             database_url = (
                 f"postgresql+psycopg2://{quote_plus(db_user)}:"
                 f"{quote_plus(db_password)}@{db_host}:{db_port}/{db_name}"
             )
         else:
-            # Allows running locally without PostgreSQL configuration.
             database_url = "sqlite:///student_management.db"
 
     app.config.update(
-        SECRET_KEY=os.environ.get("SECRET_KEY", "development-only-change-me"),
+        SECRET_KEY=os.environ.get(
+            "SECRET_KEY",
+            "development-only-change-me"
+        ),
         SQLALCHEMY_DATABASE_URI=database_url,
         SQLALCHEMY_TRACK_MODIFICATIONS=False,
     )
 
-    # Test configuration overrides environment defaults.
     if test_config:
         app.config.update(test_config)
 
     db.init_app(app)
     login_manager.init_app(app)
 
-    # Compatibility with the existing tests that use test_app.User.
     app.User = User
     app.Student = Student
 
     # --------------------------------------------------
-    # Access control
+    # Admin Access Control
     # --------------------------------------------------
 
     def admin_required(view_function):
@@ -250,55 +364,79 @@ def create_app(test_config=None):
         @login_required
         def wrapped_view(*args, **kwargs):
             if current_user.role != "admin":
-                return (
-                    "Forbidden: administrator access required",
-                    403,
-                )
+                return "Forbidden: administrator access required", 403
+
             return view_function(*args, **kwargs)
 
         return wrapped_view
 
     # --------------------------------------------------
-    # Home and health endpoints
+    # Home Page
     # --------------------------------------------------
 
     @app.route("/")
     def home():
         content = """
         <h1>Student Management System</h1>
-        <p>Manage student records through a simple web application.</p>
+
+        <p>
+    <a class="btn" href="{{ url_for('students') }}">
+        Manage Students
+    </a>
+
+    <a class="btn" href="{{ url_for('users') }}">
+        Registered Users
+    </a>
+</p>
         <div class="cards">
             <div class="card">
                 <h3>Student Records</h3>
                 <p>Add, view and update student information.</p>
             </div>
+
             <div class="card">
                 <h3>Secure Login</h3>
                 <p>Access features based on your user role.</p>
             </div>
+
             <div class="card">
                 <h3>DevOps Ready</h3>
                 <p>Designed for testing, Docker and Jenkins CI.</p>
             </div>
         </div>
+
         <p>
             <a class="btn" href="{{ url_for('login') }}">Login</a>
-            <a class="btn secondary" href="{{ url_for('register') }}">Create Account</a>
+            <a class="btn secondary" href="{{ url_for('register') }}">
+                Create Account
+            </a>
         </p>
         """
+
         return render_page("Home", content)
+
+    # --------------------------------------------------
+    # Health Check
+    # --------------------------------------------------
 
     @app.route("/health")
     def health():
         try:
             db.session.execute(db.text("SELECT 1"))
-            return jsonify(status="healthy", database="connected"), 200
+            return jsonify(
+                status="healthy",
+                database="connected"
+            ), 200
+
         except Exception:
             db.session.rollback()
-            return jsonify(status="unhealthy", database="disconnected"), 503
+            return jsonify(
+                status="unhealthy",
+                database="disconnected"
+            ), 503
 
     # --------------------------------------------------
-    # Registration and authentication
+    # Register
     # --------------------------------------------------
 
     @app.route("/register", methods=["GET", "POST"])
@@ -312,30 +450,50 @@ def create_app(test_config=None):
 
             if not username or not password:
                 flash("Username and password are required.", "warning")
+
             elif len(password) < 8:
                 flash("Password must contain at least 8 characters.", "warning")
+
             elif User.query.filter_by(username=username).first():
                 flash("That username is already registered.", "warning")
+
             else:
                 user = User(username=username, role="student")
                 user.set_password(password)
+
                 db.session.add(user)
                 db.session.commit()
-                flash("Account created successfully. Please log in.", "success")
+
+                flash(
+                    "Account created successfully. Please log in.",
+                    "success"
+                )
                 return redirect(url_for("login"))
 
         content = """
         <h1>Register</h1>
+
         <form method="post">
             <label>Username</label>
             <input name="username" required maxlength="80">
+
             <label>Password (minimum 8 characters)</label>
             <input type="password" name="password" required minlength="8">
+
             <button type="submit">Register</button>
         </form>
-        <p>Already have an account? <a href="{{ url_for('login') }}">Login</a></p>
+
+        <p>
+            Already have an account?
+            <a href="{{ url_for('login') }}">Login</a>
+        </p>
         """
+
         return render_page("Register", content)
+
+    # --------------------------------------------------
+    # Login
+    # --------------------------------------------------
 
     @app.route("/login", methods=["GET", "POST"])
     def login():
@@ -345,6 +503,7 @@ def create_app(test_config=None):
         if request.method == "POST":
             username = request.form.get("username", "").strip()
             password = request.form.get("password", "")
+
             user = User.query.filter_by(username=username).first()
 
             if user and user.check_password(password):
@@ -356,16 +515,28 @@ def create_app(test_config=None):
 
         content = """
         <h1>Login</h1>
+
         <form method="post">
             <label>Username</label>
             <input name="username" required>
+
             <label>Password</label>
             <input type="password" name="password" required>
+
             <button type="submit">Login</button>
         </form>
-        <p>New user? <a href="{{ url_for('register') }}">Register here</a></p>
+
+        <p>
+            New user?
+            <a href="{{ url_for('register') }}">Register here</a>
+        </p>
         """
+
         return render_page("Login", content)
+
+    # --------------------------------------------------
+    # Logout
+    # --------------------------------------------------
 
     @app.route("/logout")
     @login_required
@@ -382,10 +553,13 @@ def create_app(test_config=None):
     @login_required
     def dashboard():
         student_count = Student.query.count()
+
         content = """
         <h1>Dashboard</h1>
+
         <p>Welcome, <strong>{{ current_user.username }}</strong>!</p>
         <p>Role: {{ current_user.role|title }}</p>
+
         {% if current_user.role == 'admin' %}
             <div class="cards">
                 <div class="card">
@@ -393,56 +567,106 @@ def create_app(test_config=None):
                     <p>Total student records</p>
                 </div>
             </div>
-            <p><a class="btn" href="{{ url_for('students') }}">Manage Students</a></p>
+
+            <p>
+                <a class="btn" href="{{ url_for('students') }}">
+                    Manage Students
+                </a>
+            </p>
         {% else %}
-            <p>You are logged in as a student. Contact an administrator if you need record-management access.</p>
+            <p>
+                You are logged in as a student.
+                Contact an administrator if you need record-management access.
+            </p>
         {% endif %}
         """
-        return render_page("Dashboard", content, student_count=student_count)
+
+        return render_page(
+            "Dashboard",
+            content,
+            student_count=student_count
+        )
 
     # --------------------------------------------------
-    # Admin: list and add students
+    # View Students
     # --------------------------------------------------
 
     @app.route("/students")
     @admin_required
     def students():
         records = Student.query.order_by(Student.id.desc()).all()
+
         content = """
         <h1>Student Records</h1>
-        <p><a class="btn" href="{{ url_for('add_student') }}">Add Student</a></p>
+
+        <p>
+            <a class="btn" href="{{ url_for('add_student') }}">
+                Add Student
+            </a>
+        </p>
+
         {% if records %}
-        <table>
-            <thead>
-                <tr>
-                    <th>Register No.</th><th>Name</th><th>Email</th>
-                    <th>Department</th><th>Year</th><th>Phone</th><th>Actions</th>
-                </tr>
-            </thead>
-            <tbody>
-            {% for student in records %}
-                <tr>
-                    <td>{{ student.register_number }}</td>
-                    <td>{{ student.full_name }}</td>
-                    <td>{{ student.email }}</td>
-                    <td>{{ student.department }}</td>
-                    <td>{{ student.year }}</td>
-                    <td>{{ student.phone }}</td>
-                    <td>
-                        <a class="btn" href="{{ url_for('edit_student', student_id=student.id) }}">Edit</a>
-                        <form method="post" action="{{ url_for('delete_student', student_id=student.id) }}" style="display:inline">
-                            <button class="danger" type="submit" onclick="return confirm('Delete this student?')">Delete</button>
-                        </form>
-                    </td>
-                </tr>
-            {% endfor %}
-            </tbody>
-        </table>
+        <div class="table-container">
+            <table>
+                <thead>
+                    <tr>
+                        <th>Register No.</th>
+                        <th>Name</th>
+                        <th>Email</th>
+                        <th>Department</th>
+                        <th>Year</th>
+                        <th>Phone</th>
+                        <th>Actions</th>
+                    </tr>
+                </thead>
+
+                <tbody>
+                    {% for student in records %}
+                    <tr>
+                        <td>{{ student.register_number }}</td>
+                        <td>{{ student.full_name }}</td>
+                        <td>{{ student.email }}</td>
+                        <td>{{ student.department }}</td>
+                        <td>{{ student.year }}</td>
+                        <td>{{ student.phone }}</td>
+
+                        <td>
+                            <a
+                                class="btn"
+                                href="{{ url_for('edit_student', student_id=student.id) }}"
+                            >
+                                Edit
+                            </a>
+
+                            <form
+                                method="post"
+                                action="{{ url_for('delete_student', student_id=student.id) }}"
+                                style="display:inline"
+                            >
+                                <button
+                                    class="danger"
+                                    type="submit"
+                                    onclick="return confirm('Delete this student?')"
+                                >
+                                    Delete
+                                </button>
+                            </form>
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
         {% else %}
             <p>No student records found.</p>
         {% endif %}
         """
+
         return render_page("Students", content, records=records)
+
+    # --------------------------------------------------
+    # Add Student
+    # --------------------------------------------------
 
     @app.route("/students/add", methods=["GET", "POST"])
     @admin_required
@@ -455,10 +679,21 @@ def create_app(test_config=None):
             year = request.form.get("year", "").strip()
             phone = request.form.get("phone", "").strip()
 
-            if not all([register_number, full_name, email, department, year, phone]):
+            if not all([
+                register_number,
+                full_name,
+                email,
+                department,
+                year,
+                phone
+            ]):
                 flash("Please fill in all fields.", "warning")
-            elif Student.query.filter_by(register_number=register_number).first():
+
+            elif Student.query.filter_by(
+                register_number=register_number
+            ).first():
                 flash("That register number already exists.", "warning")
+
             else:
                 student = Student(
                     register_number=register_number,
@@ -468,15 +703,17 @@ def create_app(test_config=None):
                     year=year,
                     phone=phone,
                 )
+
                 db.session.add(student)
                 db.session.commit()
+
                 flash("Student added successfully.", "success")
                 return redirect(url_for("students"))
 
         return render_student_form("Add Student")
 
     # --------------------------------------------------
-    # Admin: edit and delete students
+    # Edit Student
     # --------------------------------------------------
 
     @app.route("/students/<int:student_id>/edit", methods=["GET", "POST"])
@@ -485,78 +722,184 @@ def create_app(test_config=None):
         student = db.get_or_404(Student, student_id)
 
         if request.method == "POST":
-            register_number = request.form.get("register_number", "").strip()
+            fields = [
+                "register_number",
+                "full_name",
+                "email",
+                "department",
+                "year",
+                "phone",
+            ]
+
+            values = {
+                field: request.form.get(field, "").strip()
+                for field in fields
+            }
 
             duplicate = Student.query.filter(
-                Student.register_number == register_number,
+                Student.register_number == values["register_number"],
                 Student.id != student.id,
             ).first()
 
-            if duplicate:
-                flash("That register number is already in use.", "warning")
-            else:
-                fields = [
-                    "register_number",
-                    "full_name",
-                    "email",
-                    "department",
-                    "year",
-                    "phone",
-                ]
-                for field in fields:
-                    setattr(student, field, request.form.get(field, "").strip())
+            if not all(values.values()):
+                flash("Please fill in all fields.", "warning")
 
-                if not all(getattr(student, field) for field in fields):
-                    db.session.rollback()
-                    flash("Please fill in all fields.", "warning")
-                else:
-                    db.session.commit()
-                    flash("Student updated successfully.", "success")
-                    return redirect(url_for("students"))
+            elif duplicate:
+                flash("That register number is already in use.", "warning")
+
+            else:
+                for field, value in values.items():
+                    setattr(student, field, value)
+
+                db.session.commit()
+
+                flash("Student updated successfully.", "success")
+                return redirect(url_for("students"))
 
         return render_student_form("Edit Student", student)
+
+    # --------------------------------------------------
+    # Delete Student
+    # --------------------------------------------------
 
     @app.route("/students/<int:student_id>/delete", methods=["POST"])
     @admin_required
     def delete_student(student_id):
         student = db.get_or_404(Student, student_id)
+
         db.session.delete(student)
         db.session.commit()
+
         flash("Student deleted successfully.", "success")
         return redirect(url_for("students"))
 
+    # --------------------------------------------------
+    # Add / Edit Student Form
+    # --------------------------------------------------
+
     def render_student_form(title, student=None):
-        student = student or Student(
-            register_number="",
-            full_name="",
-            email="",
-            department="",
-            year="",
-            phone="",
-        )
+        if student is None:
+            student = Student(
+                register_number="",
+                full_name="",
+                email="",
+                department="",
+                year="",
+                phone="",
+            )
+
         content = """
         <h1>{{ title }}</h1>
+
         <form method="post">
             <label>Register Number</label>
-            <input name="register_number" value="{{ student.register_number }}" required>
+            <input
+                name="register_number"
+                value="{{ student.register_number }}"
+                required
+            >
+
             <label>Full Name</label>
-            <input name="full_name" value="{{ student.full_name }}" required>
+            <input
+                name="full_name"
+                value="{{ student.full_name }}"
+                required
+            >
+
             <label>Email</label>
-            <input type="email" name="email" value="{{ student.email }}" required>
+            <input
+                type="email"
+                name="email"
+                value="{{ student.email }}"
+                required
+            >
+
             <label>Department</label>
-            <input name="department" value="{{ student.department }}" required>
+            <input
+                name="department"
+                value="{{ student.department }}"
+                required
+            >
+
             <label>Year</label>
-            <input name="year" value="{{ student.year }}" required>
+            <input
+                name="year"
+                value="{{ student.year }}"
+                required
+            >
+
             <label>Phone</label>
-            <input name="phone" value="{{ student.phone }}" required>
+            <input
+                name="phone"
+                value="{{ student.phone }}"
+                required
+            >
+
             <button type="submit">Save</button>
-            <a class="btn secondary" href="{{ url_for('students') }}">Cancel</a>
+
+            <a
+                class="btn secondary"
+                href="{{ url_for('students') }}"
+            >
+                Cancel
+            </a>
         </form>
         """
-        return render_page(title, content, title=title, student=student)
 
-    # Create tables when the application starts.
-    # In tests, the test fixture manages table creation itself.
+        # FIX: This return is INSIDE render_student_form()
+        return render_page(
+            title,
+            content,
+            title=title,
+            student=student
+        )
+    # --------------------------------------------------
+    # Registered Users - Admin Only
+    # --------------------------------------------------
+
+    @app.route("/users")
+    @admin_required
+    def users():
+        registered_users = User.query.order_by(User.id).all()
+
+        content = """
+        <h1>Registered Users</h1>
+
+        <table>
+            <thead>
+                <tr>
+                    <th>User ID</th>
+                    <th>Username</th>
+                    <th>Role</th>
+                </tr>
+            </thead>
+
+            <tbody>
+                {% for user in registered_users %}
+                <tr>
+                    <td>{{ user.id }}</td>
+                    <td>{{ user.username }}</td>
+                    <td>{{ user.role }}</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+
+        <br>
+        <a class="btn" href="{{ url_for('dashboard') }}">
+            Back to Dashboard
+        </a>
+        """
+
+        return render_page(
+            "Registered Users",
+            content,
+            registered_users=registered_users
+        )
+    # --------------------------------------------------
+    # Create Database Tables
+    # --------------------------------------------------
+
     if not app.config.get("TESTING"):
         with app.app_context():
             db.create_all()
@@ -565,10 +908,14 @@ def create_app(test_config=None):
 
 
 # --------------------------------------------------
-# Run locally
+# Run Locally
 # --------------------------------------------------
 
 app = create_app()
 
 if __name__ == "__main__":
-    app.run(host="0.0.0.0", port=int(os.environ.get("PORT", 5000)), debug=False)
+    app.run(
+        host="0.0.0.0",
+        port=int(os.environ.get("PORT", 5000)),
+        debug=False
+    )
