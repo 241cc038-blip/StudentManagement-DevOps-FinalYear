@@ -11,6 +11,11 @@ pipeline {
 
         DATABASE_CONTAINER = 'studentmanagement-devops-finalyear-db-1'
         DOCKER_NETWORK = 'studentmanagement-devops-finalyear_default'
+
+        POSTGRES_USER = 'studentadmin'
+        POSTGRES_DB = 'studentdb'
+        POSTGRES_HOST = 'db'
+        POSTGRES_PORT = '5432'
     }
 
     stages {
@@ -92,7 +97,7 @@ if ($dbRunning -ne "true") {
     throw "Database container is not running."
 }
 
-# Check existing application container safely
+# Check existing Jenkins application container
 $existingContainer = & $docker ps -a `
     --filter "name=^/$($env:CONTAINER_NAME)$" `
     --format "{{.Names}}"
@@ -103,20 +108,20 @@ if ($LASTEXITCODE -ne 0) {
 
 if ($existingContainer -eq $env:CONTAINER_NAME) {
 
-    Write-Host "Removing old application container..."
+    Write-Host "Removing old Jenkins application container..."
 
     & $docker rm -f $env:CONTAINER_NAME
 
     if ($LASTEXITCODE -ne 0) {
-        throw "Failed to remove old container."
+        throw "Failed to remove old application container."
     }
 
 } else {
-    Write-Host "No existing container found. Creating new container..."
+    Write-Host "No existing Jenkins application container found."
 }
 
-# Deploy application
-Write-Host "Creating new application container..."
+# Deploy new application
+Write-Host "Creating new Jenkins application container..."
 
 & $docker run -d `
     --name $env:CONTAINER_NAME `
@@ -124,11 +129,11 @@ Write-Host "Creating new application container..."
     --network $env:DOCKER_NETWORK `
     -p "$($env:APP_PORT):5000" `
     -e "SECRET_KEY=$env:APP_SECRET_KEY" `
-    -e "POSTGRES_USER=postgres" `
+    -e "POSTGRES_USER=$env:POSTGRES_USER" `
     -e "POSTGRES_PASSWORD=$env:DB_PASSWORD" `
-    -e "POSTGRES_DB=student_management" `
-    -e "POSTGRES_HOST=$env:DATABASE_CONTAINER" `
-    -e "POSTGRES_PORT=5432" `
+    -e "POSTGRES_DB=$env:POSTGRES_DB" `
+    -e "POSTGRES_HOST=$env:POSTGRES_HOST" `
+    -e "POSTGRES_PORT=$env:POSTGRES_PORT" `
     $image
 
 if ($LASTEXITCODE -ne 0) {
@@ -179,7 +184,7 @@ if (-not $healthy) {
 
     Write-Host "Application health check failed."
 
-    & $docker logs $env:CONTAINER_NAME
+    & $docker logs --tail 50 $env:CONTAINER_NAME
 
     throw "Deployment health check failed."
 }
